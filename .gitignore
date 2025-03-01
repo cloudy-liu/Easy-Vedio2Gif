@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.env.bak
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+
+# Exclude large FFmpeg binaries
+lib/windows/ffmpeg.exe
+lib/windows/ffprobe.exe
+lib/mac/ffmpeg
+lib/mac/ffprobe
+
+# Keep the lib directory structure
+!lib/
+!lib/windows/
+!lib/mac/
+
+
+# User-specific files
+config.json
+tests/
+build.py
+dist/
