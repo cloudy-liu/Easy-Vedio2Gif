@@ -1,17 +1,21 @@
 # Easy Vedio2Gif 
 
-微信公众号文章使用的视频转 Gif 工具
+## 缘起
 
-![应用截图](https://github.com/Easy-Vedio2Gif/Easy-Vedio2Gif/raw/main/screenshots/app.png)
+本人开始写微信公众号技术类文章，经常需要录制视频做演示，而 gif 动图是个比较好的形式，但找了一圈并没有发现针对微信公众号视频转 gif 工具，于是动手写了这个小工具
+
+> PS: UI 设计的比较丑陋，工具类，能用就行 
+
+![应用截图]https://github.com/cloudy-liu/Easy-Vedio2Gif/blob/main/screenshots/app.png)
 
 
 ## 使用方法
 
 ### 方式一：下载预编译版本（推荐）
 
-1. 从[Releases](https://github.com/Easy-Vedio2Gif/Easy-Vedio2Gif/releases)页面下载最新版本
+1. 从[Releases](https://github.com/cloudy-liu/Easy-Vedio2Gif/releases)页面下载最新版本
 2. 解压缩文件
-3. 找到 `video2gif.exe` 文件，双击运行, **默认提供 windows 可执行文件**
+3. 找到 `video2gif.exe` 文件，双击运行, **默认仅提供 windows 可执行文件**
 
 ### 方式二：从源码运行
 
@@ -19,6 +23,7 @@
 
 - Python 3.9 或以上版本
 - 已安装 pip
+
 
 #### 安装步骤
 
@@ -55,18 +60,17 @@
    python main.py
    ```
 
-## Tips
+## 提示
 
 - 微信公众号对GIF的限制：文件大小不超过10MB，帧数不超过300帧
 - 如果生成的GIF超出限制，程序会给出提示并让您选择是否继续
 - 降低帧率、质量或时长可以减小文件大小
 - 避免选择过长时间的视频片段转换
 
-## Software stack
+## 软件栈
 
 - 本工具使用 [FFmpeg](https://ffmpeg.org/) 进行视频处理
 - 界面基于 [PyQt5](https://www.riverbankcomputing.com/software/pyqt/)
-- 图标来自 [Material Design Icons](https://materialdesignicons.com/)
 
 ## License
 
