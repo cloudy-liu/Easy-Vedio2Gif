@@ -23,12 +23,16 @@ BASE_DIR = Path(__file__).parent.absolute()
 if SYSTEM == 'Windows':
     FFMPEG_PATH = str(BASE_DIR / 'lib' / 'windows' / 'ffmpeg.exe')
     FFPROBE_PATH = str(BASE_DIR / 'lib' / 'windows' / 'ffprobe.exe')
+    # 在Windows上定义无窗口标志
+    SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW
 elif SYSTEM == 'Darwin':  # macOS
     FFMPEG_PATH = str(BASE_DIR / 'lib' / 'mac' / 'ffmpeg')
     FFPROBE_PATH = str(BASE_DIR / 'lib' / 'mac' / 'ffprobe')
+    SUBPROCESS_FLAGS = 0  # 在macOS上不需要特殊标志
 else:  # Linux or other systems use system-installed ffmpeg
     FFMPEG_PATH = 'ffmpeg'
     FFPROBE_PATH = 'ffprobe'
+    SUBPROCESS_FLAGS = 0  # 在Linux上不需要特殊标志
 
 # Ensure executable permissions (on Unix systems)
 if SYSTEM != 'Windows':
@@ -42,7 +46,7 @@ if SYSTEM != 'Windows':
 # 使用res/icons目录存放图标
 ICONS_DIR = BASE_DIR / 'res' / 'icons'
 
-# Icon utility class
+
 class Icons:
     @staticmethod
     def get_icon(name):
@@ -65,6 +69,41 @@ class LogStream(io.StringIO):
 
     def flush(self):
         pass
+
+
+# 辅助函数：封装 subprocess.run 调用
+def run_command(cmd, **kwargs):
+    """
+    封装 subprocess.run 调用，自动处理平台特定的 creationflags
+    
+    Args:
+        cmd: 要执行的命令列表
+        **kwargs: 传递给 subprocess.run 的其他参数
+    
+    Returns:
+        subprocess.CompletedProcess 对象
+    """
+    if SYSTEM == 'Windows':
+        return subprocess.run(cmd, creationflags=SUBPROCESS_FLAGS, **kwargs)
+    else:
+        return subprocess.run(cmd, **kwargs)
+
+# 辅助函数：封装 subprocess.Popen 调用
+def start_command_process(cmd, **kwargs):
+    """
+    封装 subprocess.Popen 调用，自动处理平台特定的 creationflags
+    
+    Args:
+        cmd: 要执行的命令列表
+        **kwargs: 传递给 subprocess.Popen 的其他参数
+    
+    Returns:
+        subprocess.Popen 对象
+    """
+    if SYSTEM == 'Windows':
+        return subprocess.Popen(cmd, creationflags=SUBPROCESS_FLAGS, **kwargs)
+    else:
+        return subprocess.Popen(cmd, **kwargs)
 
 
 class ConversionThread(QThread):
@@ -116,8 +155,7 @@ class ConversionThread(QThread):
                         '-of', 'default=noprint_wrappers=1:nokey=1',
                         self.input_file
                     ]
-                    result = subprocess.run(
-                        cmd, capture_output=True, text=True)
+                    result = run_command(cmd, capture_output=True, text=True)
                     total_duration = float(result.stdout.strip())
                     self.duration = total_duration - self.start_time
 
@@ -152,7 +190,7 @@ class ConversionThread(QThread):
                 self.log_signal.emit(f"调色板命令: {' '.join(palette_cmd)}\n")
                 self.progress_signal.emit(25)
 
-                process = subprocess.Popen(
+                process = start_command_process(
                     palette_cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -184,7 +222,7 @@ class ConversionThread(QThread):
                 self.log_signal.emit(f"GIF转换命令: {' '.join(gif_cmd)}\n")
                 self.progress_signal.emit(50)
 
-                process = subprocess.Popen(
+                process = start_command_process(
                     gif_cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -304,14 +342,14 @@ class SettingsDialog(QDialog):
         self.setMinimumWidth(500)
         self.output_dir = output_dir
         self.ask_save_location = ask_save_location
-        
+
         # Dialog layout
         layout = QVBoxLayout()
-        
+
         # Output directory settings
         output_dir_group = QGroupBox("输出设置")
         output_dir_layout = QVBoxLayout()
-        
+
         # Output directory selection
         dir_layout = QHBoxLayout()
         self.output_dir_label = QLabel(f"输出目录: {self.output_dir}")
@@ -319,23 +357,24 @@ class SettingsDialog(QDialog):
         self.change_dir_btn.clicked.connect(self.change_output_dir)
         dir_layout.addWidget(self.output_dir_label, 1)
         dir_layout.addWidget(self.change_dir_btn, 0)
-        
+
         # Ask save location checkbox
         self.ask_location_checkbox = QCheckBox("每次询问保存位置")
         self.ask_location_checkbox.setChecked(self.ask_save_location)
-        
+
         output_dir_layout.addLayout(dir_layout)
         output_dir_layout.addWidget(self.ask_location_checkbox)
         output_dir_group.setLayout(output_dir_layout)
-        
+
         # Add to main layout
         layout.addWidget(output_dir_group)
-        
+
         # Dialog buttons
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
-        
+
         # Style the OK button
         ok_button = button_box.button(QDialogButtonBox.Ok)
         ok_button.setStyleSheet("""
@@ -345,20 +384,20 @@ class SettingsDialog(QDialog):
             border-radius: 6px;
             padding: 8px 16px;
         """)
-        
+
         layout.addWidget(button_box)
         self.setLayout(layout)
-    
+
     def change_output_dir(self):
         dir_path = QFileDialog.getExistingDirectory(
             self, "选择输出目录", self.output_dir,
             QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
         )
-        
+
         if dir_path:
             self.output_dir = dir_path
             self.output_dir_label.setText(f"输出目录: {self.output_dir}")
-    
+
     def get_settings(self):
         return {
             "output_dir": self.output_dir,
@@ -376,17 +415,18 @@ class Video2GifApp(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_output_estimate)
         self.timer.setInterval(100)  # Update every 100ms when settings change
-        
+
         # 设置默认值
-        self.default_output_dir = str(Path.home() / "Downloads")  # 设置默认输出目录为用户的下载文件夹
+        self.default_output_dir = str(
+            Path.home() / "Downloads")  # 设置默认输出目录为用户的下载文件夹
         self.ask_save_location = False
-        
+
         # 加载配置文件
         self.config_file = Path(BASE_DIR) / "config.json"
         self.log_text = None  # 初始化为None
-        
+
         self.initUI()
-        
+
         # 在UI初始化后加载配置
         self.load_config()
 
@@ -420,14 +460,12 @@ class Video2GifApp(QMainWindow):
         self.file_info_label = QLabel("请选择一个视频文件")
         self.file_info_label.setAlignment(Qt.AlignCenter)
         file_selection_layout.addWidget(self.file_info_label)
-        
+
         file_selection_group.setLayout(file_selection_layout)
 
-        # ===== Middle area: Settings and estimates =====
         middle_widget = QWidget()
         middle_layout = QHBoxLayout()
 
-        # ------ Left side: GIF settings ------
         settings_group = QGroupBox("设置区")
         settings_form_layout = QFormLayout()
         settings_form_layout.setSpacing(10)
@@ -537,13 +575,13 @@ class Video2GifApp(QMainWindow):
 
         # Add buttons row
         buttons_layout = QHBoxLayout()
-        
+
         # Settings button
         self.settings_btn = QPushButton("设置")
         self.settings_btn.setMinimumHeight(40)
         self.settings_btn.setMinimumWidth(80)
         self.settings_btn.clicked.connect(self.open_settings_dialog)
-        
+
         # Convert button
         self.convert_btn = QPushButton("start")
         self.convert_btn.setMinimumHeight(40)
@@ -558,7 +596,7 @@ class Video2GifApp(QMainWindow):
             self.convert_btn.setIconSize(QSize(20, 20))
 
         self.convert_btn.clicked.connect(self.convert_to_gif)
-        
+
         # Add buttons to layout
         buttons_layout.addWidget(self.settings_btn, alignment=Qt.AlignLeft)
         buttons_layout.addStretch()
@@ -838,7 +876,7 @@ class Video2GifApp(QMainWindow):
                 '-of', 'default=noprint_wrappers=1:nokey=1',
                 file_path
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = run_command(cmd, capture_output=True, text=True)
             self.video_duration = float(result.stdout.strip())
 
             # Update duration spinbox max value
@@ -856,7 +894,7 @@ class Video2GifApp(QMainWindow):
                 '-of', 'csv=s=x:p=0',
                 file_path
             ]
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = run_command(cmd, capture_output=True, text=True)
             resolution = result.stdout.strip()
 
             # 解析宽高用于估算
@@ -887,13 +925,15 @@ class Video2GifApp(QMainWindow):
             if self.config_file.exists():
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
-                    self.default_output_dir = config.get('output_dir', self.default_output_dir)
-                    self.ask_save_location = config.get('ask_save_location', False)
+                    self.default_output_dir = config.get(
+                        'output_dir', self.default_output_dir)
+                    self.ask_save_location = config.get(
+                        'ask_save_location', False)
                     self.log_message(f"已加载配置文件: {self.config_file}")
         except Exception as e:
             # If failed to load, use default values
             self.log_message(f"加载配置文件失败: {str(e)}")
-    
+
     def save_config(self):
         """Save settings to config file"""
         try:
@@ -901,27 +941,28 @@ class Video2GifApp(QMainWindow):
                 'output_dir': self.default_output_dir,
                 'ask_save_location': self.ask_save_location
             }
-            
+
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
-            
+
             self.log_message(f"已保存配置到: {self.config_file}")
         except Exception as e:
             self.log_message(f"保存配置文件失败: {str(e)}")
-    
+
     def open_settings_dialog(self):
         """Open settings dialog"""
         dialog = SettingsDialog(
-            self, 
+            self,
             output_dir=self.default_output_dir,
             ask_save_location=self.ask_save_location
         )
-        
+
         if dialog.exec_() == QDialog.Accepted:
             settings = dialog.get_settings()
             self.default_output_dir = settings['output_dir']
             self.ask_save_location = settings['ask_save_location']
-            self.log_message(f"已更新设置: 输出目录={self.default_output_dir}, 询问保存位置={self.ask_save_location}")
+            self.log_message(
+                f"已更新设置: 输出目录={self.default_output_dir}, 询问保存位置={self.ask_save_location}")
             # Save settings to config file
             self.save_config()
 
@@ -933,20 +974,22 @@ class Video2GifApp(QMainWindow):
         # 根据输入文件自动确定输出文件名
         input_path = Path(self.input_file)
         default_output_filename = input_path.stem + ".gif"
-        default_output_path = Path(self.default_output_dir) / default_output_filename
-        
+        default_output_path = Path(
+            self.default_output_dir) / default_output_filename
+
         # 根据是否选择询问保存位置来决定是否显示文件对话框
         if self.ask_save_location:
             self.output_file, _ = QFileDialog.getSaveFileName(
-                self, "保存GIF文件", str(default_output_path), "GIF文件 (*.gif);;所有文件 (*)"
+                self, "保存GIF文件", str(
+                    default_output_path), "GIF文件 (*.gif);;所有文件 (*)"
             )
-            
+
             if not self.output_file:  # 用户取消了保存对话框
                 return
         else:
             # 直接使用默认路径
             self.output_file = str(default_output_path)
-            
+
             # 检查文件是否已存在，如果存在则添加序号
             output_path = Path(self.output_file)
             counter = 1
@@ -954,7 +997,7 @@ class Video2GifApp(QMainWindow):
                 new_filename = f"{input_path.stem}_{counter}.gif"
                 output_path = Path(self.default_output_dir) / new_filename
                 counter += 1
-            
+
             self.output_file = str(output_path)
 
         if not self.output_file.lower().endswith('.gif'):
@@ -992,7 +1035,8 @@ class Video2GifApp(QMainWindow):
         self.start_conversion(start_time, duration, fps,
                               quality, width, dither_method, colors, False)
 
-    def start_conversion(self, start_time, duration, fps, quality, width, dither_method, colors, ignore_limits=False):
+    def start_conversion(self, start_time, duration, fps, quality, width, dither_method, colors,
+                         ignore_limits=False):
         """Start conversion thread with option to ignore limits."""
         self.conversion_thread = ConversionThread(
             self.input_file, self.output_file, start_time, duration, fps, quality, width,
@@ -1125,9 +1169,9 @@ class Video2GifApp(QMainWindow):
             if sys.platform == 'win32':
                 os.startfile(folder_path)
             elif sys.platform == 'darwin':  # macOS
-                subprocess.call(['open', folder_path])
+                run_command(['open', folder_path])
             else:  # Linux
-                subprocess.call(['xdg-open', folder_path])
+                run_command(['xdg-open', folder_path])
 
     def conversion_error(self, error_message):
         self.status_label.setText(f"错误: {error_message}")

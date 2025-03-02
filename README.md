@@ -1,12 +1,9 @@
 # Easy Vedio2Gif 
 
-## 缘起
 
-本人开始写微信公众号技术类文章，经常需要录制视频做演示，而 gif 动图是个比较好的形式，但找了一圈并没有发现针对微信公众号视频转 gif 工具，于是动手写了这个小工具
+最近开始在微信公众号写技术类文章，而为了演示效果，需要录制视频转gif动图，但发现并没有针对微信公众号的专转换工具，于是动手写了这个小工具
 
-> PS: UI 设计的比较丑陋，工具类，能用就行 
-
-![应用截图]https://github.com/cloudy-liu/Easy-Vedio2Gif/blob/main/screenshots/app.png)
+![应用截图](https://github.com/cloudy-liu/Easy-Vedio2Gif/blob/main/screenshots/app.png)
 
 
 ## 使用方法
