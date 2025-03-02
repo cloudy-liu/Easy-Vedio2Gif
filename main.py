@@ -131,128 +131,173 @@ class ConversionThread(QThread):
         self.dither_method = dither_method
         self.colors = colors
         self.ignore_limits = ignore_limits  # Flag to ignore limits
+        
+    def log(self, message):
+        """Helper method to emit log messages"""
+        self.log_signal.emit(message)
+    
+    def get_video_duration(self):
+        """Get video duration using ffprobe if duration is not specified"""
+        if self.duration <= 0:
+            cmd = [
+                FFPROBE_PATH,
+                '-v', 'error',
+                '-show_entries', 'format=duration',
+                '-of', 'default=noprint_wrappers=1:nokey=1',
+                self.input_file
+            ]
+            result = run_command(cmd, capture_output=True, text=True)
+            total_duration = float(result.stdout.strip())
+            self.duration = total_duration - self.start_time
+            
+        return self.duration
+    
+    def validate_frame_count(self):
+        """Validate total frames against WeChat limit"""
+        total_frames = int(self.fps * self.duration)
+        
+        # Check frame limit, but don't stop directly
+        if total_frames > 300 and not self.ignore_limits:
+            self.warning_signal.emit(
+                f"当前设置将生成 {total_frames} 帧，超过微信公众号的300帧限制。", 1)
+            return False
+            
+        return True
+    
+    def log_conversion_parameters(self):
+        """Log all conversion parameters"""
+        self.log(f"开始生成调色板...\n")
+        self.log(f"视频: {self.input_file}\n")
+        self.log(f"开始时间: {self.start_time}秒, 持续时间: {self.duration}秒\n")
+        self.log(f"帧率: {self.fps}fps, 宽度: {self.width}px, 质量级别: {self.quality}\n")
+        self.log(f"抖动方法: {self.dither_method}, 调色板颜色数: {self.colors}\n")
+    
+    def generate_palette(self, palette_file):
+        """Generate a palette for better GIF quality"""
+        # Build palette generation command
+        palette_cmd = [
+            FFMPEG_PATH, '-y',
+            '-ss', str(self.start_time),
+            '-t', str(self.duration),
+            '-i', self.input_file,
+            '-vf',
+            f'fps={self.fps},scale={self.width}:-1:flags=lanczos,palettegen=max_colors={self.colors}:stats_mode=full',
+            palette_file
+        ]
+
+        self.log(f"调色板命令: {' '.join(palette_cmd)}\n")
+        self.progress_signal.emit(25)
+
+        # Execute palette generation
+        process = start_command_process(
+            palette_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            bufsize=1
+        )
+
+        # Read and log output
+        for line in process.stderr:
+            self.log(line)
+
+        process.wait()
+        if process.returncode != 0:
+            raise Exception("调色板生成失败")
+            
+        self.log(f"调色板生成成功，开始转换GIF...\n")
+        return True
+    
+    def convert_to_gif(self, palette_file):
+        """Convert video to GIF using the generated palette"""
+        # Build GIF conversion command
+        gif_cmd = [
+            FFMPEG_PATH, '-y',
+            '-ss', str(self.start_time),
+            '-t', str(self.duration),
+            '-i', self.input_file,
+            '-i', palette_file,
+            '-lavfi',
+            f'fps={self.fps},scale={self.width}:-1:flags=lanczos [x]; [x][1:v] paletteuse=dither={self.dither_method}:bayer_scale={6 - self.quality}',
+            self.output_file
+        ]
+
+        self.log(f"GIF转换命令: {' '.join(gif_cmd)}\n")
+        self.progress_signal.emit(50)
+
+        # Execute GIF conversion
+        process = start_command_process(
+            gif_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            bufsize=1
+        )
+
+        # Read and log output
+        for line in process.stderr:
+            self.log(line)
+
+        process.wait()
+        if process.returncode != 0:
+            raise Exception("GIF转换失败")
+            
+        return True
+    
+    def check_output_size(self):
+        """Check output file size and emit warning if needed"""
+        # Calculate total frames
+        total_frames = int(self.fps * self.duration)
+        
+        # Check file size
+        output_path = Path(self.output_file)
+        file_size = output_path.stat().st_size / (1024 * 1024)  # Size in MB
+
+        self.log(
+            f"转换完成！文件: {self.output_file}, GIF大小: {file_size:.2f}MB, "
+            f"总帧数: {total_frames}\n"
+        )
+        self.progress_signal.emit(100)
+
+        # Warn about file size exceeding limit, but don't stop
+        if file_size > 10 and not self.ignore_limits:
+            self.warning_signal.emit(
+                f"生成的GIF大小为 {file_size:.2f}MB，超过微信公众号的10MB限制。", 2)
+        else:
+            self.finished_signal.emit(
+                f"转换成功！GIF大小: {file_size:.2f}MB, 总帧数: {total_frames}")
+            
+        return file_size, total_frames
 
     def run(self):
+        """Main execution method of the thread"""
         try:
             # Create temp directory for palette
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_dir_path = Path(temp_dir)
                 palette_file = str(temp_dir_path / "palette.png")
 
-                # Get video duration using ffprobe if duration is not specified
-                if self.duration <= 0:
-                    cmd = [
-                        FFPROBE_PATH,
-                        '-v', 'error',
-                        '-show_entries', 'format=duration',
-                        '-of', 'default=noprint_wrappers=1:nokey=1',
-                        self.input_file
-                    ]
-                    result = run_command(cmd, capture_output=True, text=True)
-                    total_duration = float(result.stdout.strip())
-                    self.duration = total_duration - self.start_time
-
-                # Calculate frames based on FPS and duration to check limit
-                total_frames = int(self.fps * self.duration)
-
-                # Check frame limit, but don't stop directly
-                if total_frames > 300 and not self.ignore_limits:
-                    self.warning_signal.emit(
-                        f"当前设置将生成 {total_frames} 帧，超过微信公众号的300帧限制。", 1)
+                # Get and validate video duration
+                self.get_video_duration()
+                
+                # Validate frame count
+                if not self.validate_frame_count():
                     return  # Pause execution, wait for user response
-
-                self.log_signal.emit(f"开始生成调色板...\n")
-                self.log_signal.emit(f"视频: {self.input_file}\n")
-                self.log_signal.emit(
-                    f"开始时间: {self.start_time}秒, 持续时间: {self.duration}秒\n")
-                self.log_signal.emit(
-                    f"帧率: {self.fps}fps, 宽度: {self.width}px, 质量级别: {self.quality}\n")
-                self.log_signal.emit(
-                    f"抖动方法: {self.dither_method}, 调色板颜色数: {self.colors}\n")
-
-                # Generate a palette for better quality
-                palette_cmd = [
-                    FFMPEG_PATH, '-y',
-                    '-ss', str(self.start_time),
-                    '-t', str(self.duration),
-                    '-i', self.input_file,
-                    '-vf',
-                    f'fps={self.fps},scale={self.width}:-1:flags=lanczos,palettegen=max_colors={self.colors}:stats_mode=full',
-                    palette_file
-                ]
-
-                self.log_signal.emit(f"调色板命令: {' '.join(palette_cmd)}\n")
-                self.progress_signal.emit(25)
-
-                process = start_command_process(
-                    palette_cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    universal_newlines=True,
-                    bufsize=1
-                )
-
-                # Read and log output
-                for line in process.stderr:
-                    self.log_signal.emit(line)
-
-                process.wait()
-                if process.returncode != 0:
-                    raise Exception("调色板生成失败")
-
-                self.log_signal.emit(f"调色板生成成功，开始转换GIF...\n")
-
-                # Convert video to GIF using the palette
-                gif_cmd = [
-                    FFMPEG_PATH, '-y',
-                    '-ss', str(self.start_time),
-                    '-t', str(self.duration),
-                    '-i', self.input_file,
-                    '-i', palette_file,
-                    '-lavfi',
-                    f'fps={self.fps},scale={self.width}:-1:flags=lanczos [x]; [x][1:v] paletteuse=dither={self.dither_method}:bayer_scale={6 - self.quality}',
-                    self.output_file
-                ]
-
-                self.log_signal.emit(f"GIF转换命令: {' '.join(gif_cmd)}\n")
-                self.progress_signal.emit(50)
-
-                process = start_command_process(
-                    gif_cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    universal_newlines=True,
-                    bufsize=1
-                )
-
-                # Read and log output
-                for line in process.stderr:
-                    self.log_signal.emit(line)
-
-                process.wait()
-                if process.returncode != 0:
-                    raise Exception("GIF转换失败")
-
-                # Check file size
-                output_path = Path(self.output_file)
-                file_size = output_path.stat().st_size / (1024 * 1024)  # Size in MB
-
-                self.log_signal.emit(
-                    f"转换完成！文件: {self.output_file}, GIF大小: {file_size: .2f}MB,"
-                    f"总帧数: {total_frames}\n"
-                )
-                self.progress_signal.emit(100)
-
-                # Warn about file size exceeding limit, but don't stop
-                if file_size > 10 and not self.ignore_limits:
-                    self.warning_signal.emit(
-                        f"生成的GIF大小为 {file_size:.2f}MB，超过微信公众号的10MB限制。", 2)
-                else:
-                    self.finished_signal.emit(
-                        f"转换成功！GIF大小: {file_size:.2f}MB, 总帧数: {total_frames}")
+                
+                # Log all parameters
+                self.log_conversion_parameters()
+                
+                # Generate palette
+                self.generate_palette(palette_file)
+                
+                # Convert video to GIF
+                self.convert_to_gif(palette_file)
+                
+                # Check output size and emit completion signal
+                self.check_output_size()
 
         except Exception as e:
-            self.log_signal.emit(f"错误: {str(e)}\n")
+            self.log(f"错误: {str(e)}\n")
             self.error_signal.emit(f"转换失败: {str(e)}")
 
 
