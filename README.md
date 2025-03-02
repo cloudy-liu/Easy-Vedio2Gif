@@ -2,7 +2,7 @@
 
 一个视频转高清gif动图的小工具，自用在写微信公众号技术文章中做操作演示，一个动图胜千言！
 
-<img src="https://github.com/cloudy-liu/Easy-Vedio2Gif/blob/main/screenshots/demo.gif" width="400">
+<img src="https://github.com/cloudy-liu/Easy-Vedio2Gif/blob/main/screenshots/demo.gif" width="500">
 
 技术实现：PyQt5 + FFmpeg
 
