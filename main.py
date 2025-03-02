@@ -39,35 +39,18 @@ if SYSTEM != 'Windows':
     if ffprobe_path.exists():
         os.chmod(FFPROBE_PATH, 0o755)
 
-# Create icon resource directory
-ICON_DIR = BASE_DIR / 'icons'
-ICON_DIR.mkdir(exist_ok=True)
-
-# Add support for res/icons directory
-RES_ICONS_DIR = BASE_DIR / 'res' / 'icons'
+# 使用res/icons目录存放图标
+ICONS_DIR = BASE_DIR / 'res' / 'icons'
 
 # Icon utility class
-
-
 class Icons:
     @staticmethod
     def get_icon(name):
         """Get icon path"""
-        # Check PNG files in icons directory
-        icon_path = ICON_DIR / f"{name}.png"
+        # 从res/icons目录加载图标
+        icon_path = ICONS_DIR / f"{name}.ico"
         if icon_path.exists():
             return QIcon(str(icon_path))
-
-        # Check SVG files in res/icons directory
-        res_icon_path = RES_ICONS_DIR / f"{name}.svg"
-        if res_icon_path.exists():
-            return QIcon(str(res_icon_path))
-
-        # If there are PNG files in res/icons directory
-        res_icon_png_path = RES_ICONS_DIR / f"{name}.png"
-        if res_icon_png_path.exists():
-            return QIcon(str(res_icon_png_path))
-
         return None
 
 
