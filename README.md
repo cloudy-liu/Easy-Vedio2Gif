@@ -1,10 +1,11 @@
 # Easy Vedio2Gif 
 
+一个视频转高清gif动图的小工具，自用在写微信公众号技术文章中做操作演示，一个动图胜千言！
 
-最近开始在微信公众号写技术类文章，而为了演示效果，需要录制视频转gif动图，但发现并没有针对微信公众号的专转换工具，于是动手写了这个小工具
+![demo](https://github.com/cloudy-liu/Easy-Vedio2Gif/blob/main/screenshots/demo.gif)
 
-![应用截图](https://github.com/cloudy-liu/Easy-Vedio2Gif/blob/main/screenshots/app.png)
 
+技术实现：PyQt5 + FFmpeg
 
 ## 使用方法
 
@@ -64,10 +65,6 @@
 - 降低帧率、质量或时长可以减小文件大小
 - 避免选择过长时间的视频片段转换
 
-## 软件栈
-
-- 本工具使用 [FFmpeg](https://ffmpeg.org/) 进行视频处理
-- 界面基于 [PyQt5](https://www.riverbankcomputing.com/software/pyqt/)
 
 ## License
 

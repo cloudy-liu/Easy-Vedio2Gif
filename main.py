@@ -1,38 +1,38 @@
-import sys
-import os
-import subprocess
-import tempfile
 import io
-import math
-import platform
 import json
+import os
+import platform
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QPushButton, QLabel, QFileDialog, QSlider, QSpinBox,
-                             QProgressBar, QMessageBox, QGroupBox, QFormLayout, QDoubleSpinBox,
-                             QComboBox, QSizePolicy, QTextEdit, QSplitter, QFrame,
-                             QTabWidget, QScrollArea, QCheckBox, QDialog, QDialogButtonBox)
+
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer
-from PyQt5.QtGui import QIcon, QFont, QDragEnterEvent, QDropEvent, QPixmap, QColor
+from PyQt5.QtGui import QIcon, QDragEnterEvent, QDropEvent, QPixmap
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QPushButton, QLabel, QFileDialog, QProgressBar, QMessageBox, QGroupBox,
+                             QFormLayout, QDoubleSpinBox,
+                             QComboBox, QTextEdit, QFrame,
+                             QCheckBox, QDialog, QDialogButtonBox)
 
 # Get operating system type
 SYSTEM = platform.system()
 
-# Set ffmpeg executable file paths
+# Configure ffmpeg paths for different platforms
 BASE_DIR = Path(__file__).parent.absolute()
 if SYSTEM == 'Windows':
     FFMPEG_PATH = str(BASE_DIR / 'lib' / 'windows' / 'ffmpeg.exe')
     FFPROBE_PATH = str(BASE_DIR / 'lib' / 'windows' / 'ffprobe.exe')
-    # 在Windows上定义无窗口标志
+    # No window flag for Windows
     SUBPROCESS_FLAGS = subprocess.CREATE_NO_WINDOW
 elif SYSTEM == 'Darwin':  # macOS
     FFMPEG_PATH = str(BASE_DIR / 'lib' / 'mac' / 'ffmpeg')
     FFPROBE_PATH = str(BASE_DIR / 'lib' / 'mac' / 'ffprobe')
-    SUBPROCESS_FLAGS = 0  # 在macOS上不需要特殊标志
-else:  # Linux or other systems use system-installed ffmpeg
+    SUBPROCESS_FLAGS = 0
+else:  # Linux or other systems
     FFMPEG_PATH = 'ffmpeg'
     FFPROBE_PATH = 'ffprobe'
-    SUBPROCESS_FLAGS = 0  # 在Linux上不需要特殊标志
+    SUBPROCESS_FLAGS = 0
 
 # Ensure executable permissions (on Unix systems)
 if SYSTEM != 'Windows':
@@ -43,7 +43,6 @@ if SYSTEM != 'Windows':
     if ffprobe_path.exists():
         os.chmod(FFPROBE_PATH, 0o755)
 
-# 使用res/icons目录存放图标
 ICONS_DIR = BASE_DIR / 'res' / 'icons'
 
 
@@ -51,7 +50,6 @@ class Icons:
     @staticmethod
     def get_icon(name):
         """Get icon path"""
-        # 从res/icons目录加载图标
         icon_path = ICONS_DIR / f"{name}.ico"
         if icon_path.exists():
             return QIcon(str(icon_path))
@@ -71,39 +69,34 @@ class LogStream(io.StringIO):
         pass
 
 
-# 辅助函数：封装 subprocess.run 调用
 def run_command(cmd, **kwargs):
-    """
-    封装 subprocess.run 调用，自动处理平台特定的 creationflags
-    
+    """Runs a command with subprocess.run and handles platform-specific flags.
+
     Args:
-        cmd: 要执行的命令列表
-        **kwargs: 传递给 subprocess.run 的其他参数
-    
+        cmd: List of command arguments to execute.
+        **kwargs: Additional keyword arguments passed to subprocess.run.
+
     Returns:
-        subprocess.CompletedProcess 对象
+        A subprocess.CompletedProcess object.
     """
     if SYSTEM == 'Windows':
         return subprocess.run(cmd, creationflags=SUBPROCESS_FLAGS, **kwargs)
-    else:
-        return subprocess.run(cmd, **kwargs)
+    return subprocess.run(cmd, **kwargs)
 
-# 辅助函数：封装 subprocess.Popen 调用
+
 def start_command_process(cmd, **kwargs):
-    """
-    封装 subprocess.Popen 调用，自动处理平台特定的 creationflags
-    
+    """Creates a subprocess.Popen object with platform-specific flags.
+
     Args:
-        cmd: 要执行的命令列表
-        **kwargs: 传递给 subprocess.Popen 的其他参数
-    
+        cmd: List of command arguments to execute.
+        **kwargs: Additional keyword arguments passed to subprocess.Popen.
+
     Returns:
-        subprocess.Popen 对象
+        A subprocess.Popen object.
     """
     if SYSTEM == 'Windows':
         return subprocess.Popen(cmd, creationflags=SUBPROCESS_FLAGS, **kwargs)
-    else:
-        return subprocess.Popen(cmd, **kwargs)
+    return subprocess.Popen(cmd, **kwargs)
 
 
 class ConversionThread(QThread):
@@ -115,17 +108,17 @@ class ConversionThread(QThread):
     warning_signal = pyqtSignal(str, int)
 
     def __init__(
-        self,
-        input_file,
-        output_file,
-        start_time,
-        duration,
-        fps,
-        quality,
-        width,
-        dither_method='bayer',
-        colors=256,
-        ignore_limits=False
+            self,
+            input_file,
+            output_file,
+            start_time,
+            duration,
+            fps,
+            quality,
+            width,
+            dither_method='bayer',
+            colors=256,
+            ignore_limits=False
     ):
         super().__init__()
         self.input_file = input_file
@@ -183,7 +176,8 @@ class ConversionThread(QThread):
                     '-ss', str(self.start_time),
                     '-t', str(self.duration),
                     '-i', self.input_file,
-                    '-vf', f'fps={self.fps},scale={self.width}:-1:flags=lanczos,palettegen=max_colors={self.colors}:stats_mode=full',
+                    '-vf',
+                    f'fps={self.fps},scale={self.width}:-1:flags=lanczos,palettegen=max_colors={self.colors}:stats_mode=full',
                     palette_file
                 ]
 
@@ -215,7 +209,8 @@ class ConversionThread(QThread):
                     '-t', str(self.duration),
                     '-i', self.input_file,
                     '-i', palette_file,
-                    '-lavfi', f'fps={self.fps},scale={self.width}:-1:flags=lanczos [x]; [x][1:v] paletteuse=dither={self.dither_method}:bayer_scale={6-self.quality}',
+                    '-lavfi',
+                    f'fps={self.fps},scale={self.width}:-1:flags=lanczos [x]; [x][1:v] paletteuse=dither={self.dither_method}:bayer_scale={6 - self.quality}',
                     self.output_file
                 ]
 
@@ -513,7 +508,8 @@ class Video2GifApp(QMainWindow):
         # Width
         self.width_combo = QComboBox()
         self.width_combo.addItems(
-            ["320 (小尺寸)", "480 (中等)", "640 (较大)", "800 (大尺寸)", "1024 (高清)", "1280 (超清)", "1920 (全高清)"])
+            ["320 (小尺寸)", "480 (中等)", "640 (较大)", "800 (大尺寸)", "1024 (高清)",
+             "1280 (超清)", "1920 (全高清)"])
         self.width_combo.setCurrentIndex(3)  # Default to 800px width
         self.width_combo.currentIndexChanged.connect(
             self.start_estimate_update_timer)
@@ -712,7 +708,7 @@ class Video2GifApp(QMainWindow):
                 border-radius: 6px;
             }
             QProgressBar::chunk {
-                background-color: #0071e3;
+                background-color: #34C759;
                 border-radius: 6px;
             }
             QComboBox, QDoubleSpinBox {
@@ -790,7 +786,8 @@ class Video2GifApp(QMainWindow):
             height = width * 9 // 16  # Assume 16:9 ratio
 
         # Estimate file size (based on empirical formula)
-        # File size estimation formula: frames * width * height * color depth factor * quality factor / compression factor
+        # File size estimation formula: frames * width * height * color depth factor * quality
+        # factor / compression factor
         color_depth_factor = colors / 256.0
         compression_factor = 30000.0  # Adjust this value to match actual results
 
@@ -1120,7 +1117,6 @@ class Video2GifApp(QMainWindow):
             self.start_conversion(start_time, duration, fps,
                                   quality, width, dither_method, colors, True)
         else:
-            # 用户选择取消
             self.log_message("用户取消了转换操作\n")
             self.status_label.setText("转换已取消")
 
