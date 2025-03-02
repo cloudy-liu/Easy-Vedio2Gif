@@ -131,11 +131,11 @@ class ConversionThread(QThread):
         self.dither_method = dither_method
         self.colors = colors
         self.ignore_limits = ignore_limits  # Flag to ignore limits
-        
+
     def log(self, message):
         """Helper method to emit log messages"""
         self.log_signal.emit(message)
-    
+
     def get_video_duration(self):
         """Get video duration using ffprobe if duration is not specified"""
         if self.duration <= 0:
@@ -149,21 +149,21 @@ class ConversionThread(QThread):
             result = run_command(cmd, capture_output=True, text=True)
             total_duration = float(result.stdout.strip())
             self.duration = total_duration - self.start_time
-            
+
         return self.duration
-    
+
     def validate_frame_count(self):
         """Validate total frames against WeChat limit"""
         total_frames = int(self.fps * self.duration)
-        
+
         # Check frame limit, but don't stop directly
         if total_frames > 300 and not self.ignore_limits:
             self.warning_signal.emit(
                 f"当前设置将生成 {total_frames} 帧，超过微信公众号的300帧限制。", 1)
             return False
-            
+
         return True
-    
+
     def log_conversion_parameters(self):
         """Log all conversion parameters"""
         self.log(f"开始生成调色板...\n")
@@ -171,7 +171,7 @@ class ConversionThread(QThread):
         self.log(f"开始时间: {self.start_time}秒, 持续时间: {self.duration}秒\n")
         self.log(f"帧率: {self.fps}fps, 宽度: {self.width}px, 质量级别: {self.quality}\n")
         self.log(f"抖动方法: {self.dither_method}, 调色板颜色数: {self.colors}\n")
-    
+
     def generate_palette(self, palette_file):
         """Generate a palette for better GIF quality"""
         # Build palette generation command
@@ -204,10 +204,10 @@ class ConversionThread(QThread):
         process.wait()
         if process.returncode != 0:
             raise Exception("调色板生成失败")
-            
+
         self.log(f"调色板生成成功，开始转换GIF...\n")
         return True
-    
+
     def convert_to_gif(self, palette_file):
         """Convert video to GIF using the generated palette"""
         # Build GIF conversion command
@@ -241,14 +241,14 @@ class ConversionThread(QThread):
         process.wait()
         if process.returncode != 0:
             raise Exception("GIF转换失败")
-            
+
         return True
-    
+
     def check_output_size(self):
         """Check output file size and emit warning if needed"""
         # Calculate total frames
         total_frames = int(self.fps * self.duration)
-        
+
         # Check file size
         output_path = Path(self.output_file)
         file_size = output_path.stat().st_size / (1024 * 1024)  # Size in MB
@@ -266,7 +266,7 @@ class ConversionThread(QThread):
         else:
             self.finished_signal.emit(
                 f"转换成功！GIF大小: {file_size:.2f}MB, 总帧数: {total_frames}")
-            
+
         return file_size, total_frames
 
     def run(self):
@@ -279,20 +279,20 @@ class ConversionThread(QThread):
 
                 # Get and validate video duration
                 self.get_video_duration()
-                
+
                 # Validate frame count
                 if not self.validate_frame_count():
                     return  # Pause execution, wait for user response
-                
+
                 # Log all parameters
                 self.log_conversion_parameters()
-                
+
                 # Generate palette
                 self.generate_palette(palette_file)
-                
+
                 # Convert video to GIF
                 self.convert_to_gif(palette_file)
-                
+
                 # Check output size and emit completion signal
                 self.check_output_size()
 
