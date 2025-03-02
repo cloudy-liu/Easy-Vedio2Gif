@@ -411,18 +411,18 @@ class Video2GifApp(QMainWindow):
         self.timer.timeout.connect(self.update_output_estimate)
         self.timer.setInterval(100)  # Update every 100ms when settings change
 
-        # 设置默认值
+        # Set default values
         self.default_output_dir = str(
-            Path.home() / "Downloads")  # 设置默认输出目录为用户的下载文件夹
+            Path.home() / "Downloads")  # Set default output directory to the user's Downloads folder
         self.ask_save_location = False
 
-        # 加载配置文件
+        # Load configuration file
         self.config_file = Path(BASE_DIR) / "config.json"
-        self.log_text = None  # 初始化为None
+        self.log_text = None  # Initialize as None
 
         self.initUI()
 
-        # 在UI初始化后加载配置
+        # Load configuration after initializing the UI
         self.load_config()
 
     def initUI(self):
@@ -826,15 +826,15 @@ class Video2GifApp(QMainWindow):
             """)
 
     def log_message(self, message):
-        # 确保log_text已经初始化
+        # Ensure that log_text is initialized
         if hasattr(self, 'log_text') and self.log_text is not None:
             self.log_text.append(message)
-            # Auto-scroll to bottom
+            # Auto-scroll to the bottom
             self.log_text.verticalScrollBar().setValue(
                 self.log_text.verticalScrollBar().maximum()
             )
         else:
-            # 如果log_text未初始化，只打印到控制台
+            # If log_text is not initialized, print to the console
             print(f"Log: {message}")
 
     def clear_log(self):
@@ -858,9 +858,9 @@ class Video2GifApp(QMainWindow):
 
         self.log_message(f"已选择文件: {file_path}")
 
-        # 在拖放区域显示已选择的文件名
-        self.drop_area.label.setPixmap(QPixmap())  # 清除图标
-        self.drop_area.label.setText(f"已选择: {filename}")  # 在拖放区显示文件名
+        # Display the selected file name in the drop area
+        self.drop_area.label.setPixmap(QPixmap())  # Clear the icon
+        self.drop_area.label.setText(f"已选择: {filename}")  # Show the file name in the drop area
         self.drop_area.label.setStyleSheet(
             "background-color: #e6f7ff; border-radius: 8px; padding: 15px; border: 1px solid #0071e3;")
 
@@ -876,10 +876,10 @@ class Video2GifApp(QMainWindow):
             result = run_command(cmd, capture_output=True, text=True)
             self.video_duration = float(result.stdout.strip())
 
-            # Update duration spinbox max value
+            # Update the maximum value of the duration spinbox
             self.duration_spin.setRange(0.1, self.video_duration)
 
-            # 默认使用整个视频时长
+            # Use the full video duration by default
             self.duration_spin.setValue(self.video_duration)
 
             # Get resolution
@@ -894,7 +894,7 @@ class Video2GifApp(QMainWindow):
             result = run_command(cmd, capture_output=True, text=True)
             resolution = result.stdout.strip()
 
-            # 解析宽高用于估算
+            # Parse width and height for estimation
             if "x" in resolution:
                 width_str, height_str = resolution.split("x")
                 self.video_width = int(width_str)
@@ -903,12 +903,12 @@ class Video2GifApp(QMainWindow):
             self.log_message(
                 f"视频信息: 时长={self.video_duration:.1f}秒, 分辨率={resolution}")
 
-            # 只在下方标签显示时长和分辨率信息，不重复显示文件名
+            # Display duration and resolution information in the label below without repeating the file name
             self.file_info_label.setText(
                 f"时长: {self.video_duration:.1f}秒, 分辨率: {resolution}")
             self.convert_btn.setEnabled(True)
 
-            # 更新输出估计
+            # Update the output estimate
             self.update_output_estimate()
         except Exception as e:
             error_msg = f"无法读取视频信息: {str(e)}"
@@ -968,26 +968,26 @@ class Video2GifApp(QMainWindow):
             QMessageBox.warning(self, "错误", "请先选择一个视频文件")
             return
 
-        # 根据输入文件自动确定输出文件名
+        # Automatically determine the output file name based on the input file
         input_path = Path(self.input_file)
         default_output_filename = input_path.stem + ".gif"
         default_output_path = Path(
             self.default_output_dir) / default_output_filename
 
-        # 根据是否选择询问保存位置来决定是否显示文件对话框
+        # Determine whether to show the file dialog based on whether to ask for save location
         if self.ask_save_location:
             self.output_file, _ = QFileDialog.getSaveFileName(
                 self, "保存GIF文件", str(
                     default_output_path), "GIF文件 (*.gif);;所有文件 (*)"
             )
 
-            if not self.output_file:  # 用户取消了保存对话框
+            if not self.output_file:  # User canceled the save dialog
                 return
         else:
-            # 直接使用默认路径
+            # Use the default path directly
             self.output_file = str(default_output_path)
 
-            # 检查文件是否已存在，如果存在则添加序号
+            # Check if the file already exists, and if so, add a number
             output_path = Path(self.output_file)
             counter = 1
             while output_path.exists():
@@ -1086,7 +1086,6 @@ class Video2GifApp(QMainWindow):
         clicked_button = msg_box.clickedButton()
 
         if clicked_button == continue_btn:
-            # 用户选择继续，重新开始转换，忽略限制
             self.log_message("用户选择忽略限制，继续转换...\n")
             self.progress_bar.setVisible(True)
             self.convert_btn.setEnabled(False)
